@@ -20,7 +20,7 @@ This starts the Vite UI and the local API server together.
 - `RESEND_API_KEY` and `RESEND_FROM_EMAIL` send branded confirmation emails.
 - `SUPABASE_URL` and `SUPABASE_SECRET_KEY` store enrollments and learner profiles in Supabase.
 - `SUPABASE_PUBLISHABLE_KEY` is kept for future client-side Supabase work.
-- Supabase Auth uses a magic link flow for the learner login experience.
+- Supabase Auth uses an email + password flow for the learner login experience.
 - Resend works best with a verified sender on the Faith Tech domain later on; your current Gmail sender is fine for testing if it is verified in Resend.
 
 ## Deploy

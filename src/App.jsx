@@ -98,14 +98,15 @@ function saveUnlock(courseSlug, value) {
 
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [enrollmentStatus, setEnrollmentStatus] = useState("idle");
+  const [enrollmentNotice, setEnrollmentNotice] = useState("");
   const [paymentStatus, setPaymentStatus] = useState(getPaymentStatusFromUrl);
   const [paymentNotice, setPaymentNotice] = useState(getPaymentNoticeFromUrl);
   const [unlocks, setUnlocks] = useState(() => readUnlocks());
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    password: "",
     course: "3D CAD Modeling",
   });
   const tutor = {
@@ -178,23 +179,23 @@ function App() {
   function handleSubmit(event) {
     event.preventDefault();
     setEnrollmentStatus("loading");
+    setEnrollmentNotice("");
 
     enrollLearner(formData)
       .then((result) => {
-        setSubmitted(true);
         setEnrollmentStatus("success");
-        setPaymentNotice(result.message);
+        setEnrollmentNotice(`${result.message} Access level: ${result.accessLevel || "free"}.`);
       })
       .catch((error) => {
         setEnrollmentStatus("error");
-        setPaymentNotice(error.message);
+        setEnrollmentNotice(error.message);
       });
   }
 
   function handleChange(event) {
     const { name, value } = event.target;
 
-    setSubmitted(false);
+    setEnrollmentNotice("");
     setPaymentNotice("");
     setFormData((current) => ({
       ...current,
@@ -390,8 +391,8 @@ function App() {
                   <p className="eyebrow">Enrollment</p>
                   <h3>Reserve your seat and create your learner profile</h3>
                   <p>
-                    Submitting creates a learner profile, sends a magic-link email, and prepares
-                    your account for future course access.
+                    Submit your details, set a password, and we’ll create your learner profile
+                    right away.
                   </p>
                 </div>
 
@@ -419,29 +420,44 @@ function App() {
                   </label>
 
                   <label>
+                    Create password
+                    <input
+                      type="password"
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      placeholder="At least 8 characters"
+                    />
+                  </label>
+
+                  <label>
                     Course interest
                     <select name="course" value={formData.course} onChange={handleChange}>
                       {courseOptions.map((course) => (
                         <option key={course} value={course}>
                           {course}
                         </option>
-                      ))}
-                    </select>
+                    ))}
+                  </select>
                   </label>
 
-                  <button className="primary-btn form-button" type="submit" disabled={enrollmentStatus === "loading"}>
+                  <button
+                    className="primary-btn form-button"
+                    type="submit"
+                    disabled={enrollmentStatus === "loading"}
+                  >
                     {enrollmentStatus === "loading" ? "Sending..." : "Submit Interest"}
                   </button>
                 </form>
 
-                {submitted ? (
+                {enrollmentNotice ? (
                   <p className="form-status success">
-                    Thanks. Your learner profile is ready and your login email has been sent.
+                    {enrollmentNotice}
                   </p>
                 ) : (
                   <p className="form-status">
-                    This now connects to Resend, Supabase learner profiles, and Paystack-ready
-                    paid course unlocks.
+                    Free learners get instant access to basics. Premium learners can unlock
+                    advanced content later with payment.
                   </p>
                 )}
               </article>

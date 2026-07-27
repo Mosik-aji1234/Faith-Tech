@@ -11,6 +11,7 @@ const premiumCourses = {
     title: "Advanced Projects",
     amountKobo: 2500000,
     currency: "NGN",
+    accessLevel: "premium",
   },
 };
 
@@ -42,8 +43,14 @@ function normalizeCourse(value) {
   const record = premiumCourses[slug];
 
   return record
-    ? { slug, title: record.title, amountKobo: record.amountKobo, currency: record.currency }
-    : { slug, title };
+    ? {
+        slug,
+        title: record.title,
+        amountKobo: record.amountKobo,
+        currency: record.currency,
+        accessLevel: record.accessLevel || "premium",
+      }
+    : { slug, title, accessLevel: "free" };
 }
 
 function validateEmail(email) {
@@ -133,15 +140,39 @@ async function persistLearnerProfile(record, env) {
   return { provider: "local-file" };
 }
 
-async function createSupabaseMagicLink(record, env, origin) {
+async function findSupabaseUserByEmail(email, env) {
+  const serviceKey = getSupabaseServiceKey(env);
+
+  if (!env.SUPABASE_URL || !serviceKey) {
+    return null;
+  }
+
+  const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/auth/v1/admin/users?per_page=1000`, {
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+    },
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = await response.json();
+  const users = Array.isArray(payload.users) ? payload.users : [];
+  const lowerEmail = String(email || "").trim().toLowerCase();
+
+  return users.find((user) => String(user.email || "").trim().toLowerCase() === lowerEmail) || null;
+}
+
+async function createSupabasePasswordUser(record, password, env) {
   if (!env.SUPABASE_URL || !getSupabaseServiceKey(env)) {
-    return { provider: "disabled", actionLink: null };
+    return { provider: "disabled", userId: null };
   }
 
   const serviceKey = getSupabaseServiceKey(env);
-  const siteUrl = getSiteUrl(env, origin);
-
-  const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/auth/v1/admin/generate_link`, {
+  const apiRoot = env.SUPABASE_URL.replace(/\/$/, "");
+  const response = await fetch(`${apiRoot}/auth/v1/admin/users`, {
     method: "POST",
     headers: {
       apikey: serviceKey,
@@ -149,24 +180,62 @@ async function createSupabaseMagicLink(record, env, origin) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      type: "magiclink",
       email: record.email,
-      options: {
-        redirectTo: `${siteUrl}/?auth=magic-link`,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        name: record.name,
+        course: record.course.title,
+        access_level: record.accessLevel,
       },
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`Supabase magic-link creation failed: ${await response.text()}`);
+    const errorText = await response.text();
+
+    if (errorText.includes("email_exists")) {
+      const existingUser = await findSupabaseUserByEmail(record.email, env);
+
+      if (existingUser?.id) {
+        const updateResponse = await fetch(`${apiRoot}/auth/v1/admin/users/${existingUser.id}`, {
+          method: "PUT",
+          headers: {
+            apikey: serviceKey,
+            Authorization: `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            password,
+            email_confirm: true,
+            user_metadata: {
+              name: record.name,
+              course: record.course.title,
+              access_level: record.accessLevel,
+            },
+          }),
+        });
+
+        if (!updateResponse.ok) {
+          throw new Error(`Supabase user update failed: ${await updateResponse.text()}`);
+        }
+
+        return {
+          provider: "supabase",
+          userId: existingUser.id,
+          reused: true,
+        };
+      }
+    }
+
+    throw new Error(`Supabase user creation failed: ${errorText}`);
   }
 
   const payload = await response.json();
 
   return {
     provider: "supabase",
-    actionLink: payload.properties?.action_link || payload.action_link || null,
-    identityId: payload.properties?.identity_id || null,
+    userId: payload.id || payload.user?.id || null,
   };
 }
 
@@ -184,18 +253,15 @@ async function sendConfirmationEmail(record, env) {
     body: JSON.stringify({
       from: env.RESEND_FROM_EMAIL,
       to: [record.email],
-      subject: `Faith Tech learner profile created for ${record.course.title}`,
+      subject: `Faith Tech account created for ${record.course.title}`,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6;">
           <h2>Welcome to Faith Tech</h2>
           <p>Your learner profile has been created for <strong>${record.course.title}</strong>.</p>
           <p>Name: ${record.name}</p>
           <p>Email: ${record.email}</p>
-          ${
-            record.loginLink
-              ? `<p><a href="${record.loginLink}" target="_blank" rel="noreferrer">Open your magic login link</a></p>`
-              : "<p>Your magic login link will be shared once Supabase Auth is fully configured.</p>"
-          }
+          <p>Access level: <strong>${record.accessLevel}</strong></p>
+          <p>You can log in with your email and password.</p>
           <p>We will follow up with the next steps soon.</p>
         </div>
       `,
@@ -311,14 +377,19 @@ export async function handleApiRequest({ method, pathname, body, headers, env, o
   if (method === "POST" && pathname === "/api/enroll") {
     const name = String(requestBody.name || "").trim();
     const email = String(requestBody.email || "").trim();
+    const password = String(requestBody.password || "").trim();
     const courseName = String(requestBody.course || "").trim();
 
-    if (!name || !email || !courseName) {
-      return jsonResponse(400, { error: "Name, email, and course are required." });
+    if (!name || !email || !password || !courseName) {
+      return jsonResponse(400, { error: "Name, email, password, and course are required." });
     }
 
     if (!validateEmail(email)) {
       return jsonResponse(400, { error: "Please provide a valid email address." });
+    }
+
+    if (password.length < 8) {
+      return jsonResponse(400, { error: "Password must be at least 8 characters long." });
     }
 
     const course = normalizeCourse(courseName);
@@ -326,26 +397,29 @@ export async function handleApiRequest({ method, pathname, body, headers, env, o
       return jsonResponse(400, { error: "Please choose a valid course." });
     }
 
+    const accessLevel = course.accessLevel || (course.amountKobo ? "premium" : "free");
+    const status = accessLevel;
+
     const record = {
       id: randomUUID(),
       name,
       email,
       course,
       createdAt: new Date().toISOString(),
-      status: "pending",
+      status,
+      accessLevel,
       source: headers["user-agent"] || "unknown",
     };
 
-    const magicLink = await createSupabaseMagicLink(record, env, origin);
+    const authUser = await createSupabasePasswordUser(record, password, env);
     const profileRecord = {
       id: randomUUID(),
-      auth_user_id: magicLink.identityId,
+      auth_user_id: authUser.userId,
       name,
       email,
       course: course.title,
       course_slug: course.slug,
-      status: "pending_login",
-      magic_link_provider: magicLink.provider,
+      status,
       created_at: record.createdAt,
       updated_at: record.createdAt,
     };
@@ -353,29 +427,29 @@ export async function handleApiRequest({ method, pathname, body, headers, env, o
     const profileStorage = await persistLearnerProfile(profileRecord, env);
     const stored = await persistEnrollment(
       {
-        ...record,
+        id: record.id,
+        name: record.name,
+        email: record.email,
+        course: record.course,
+        created_at: record.createdAt,
+        status: record.status,
+        source: record.source,
         profile_id: profileRecord.id,
-        magic_link_provider: magicLink.provider,
-        magic_link_sent_at: magicLink.actionLink ? new Date().toISOString() : null,
+        auth_user_id: authUser.userId,
       },
       env,
     );
-    const emailResult = await sendConfirmationEmail(
-      {
-        ...record,
-        loginLink: magicLink.actionLink,
-      },
-      env,
-    );
+    const emailResult = await sendConfirmationEmail(record, env);
 
     return jsonResponse(201, {
-      message: `Learner profile created for ${course.title}. Check your email for the magic link.`,
+      message: `Learner profile created for ${course.title}. You can log in with email and password.`,
       enrollmentId: record.id,
       profileId: profileRecord.id,
       storage: stored.provider,
       profileStorage: profileStorage.provider,
       email: emailResult.provider,
-      loginLinkProvider: magicLink.provider,
+      authProvider: authUser.provider,
+      accessLevel,
     });
   }
 

@@ -1,5 +1,42 @@
 import http from "node:http";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { handleApiRequest } from "./shared.mjs";
+
+async function loadEnvFile(filePath) {
+  try {
+    const content = await readFile(filePath, "utf8");
+    for (const line of content.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) {
+        continue;
+      }
+
+      const separatorIndex = trimmed.indexOf("=");
+      if (separatorIndex === -1) {
+        continue;
+      }
+
+      const key = trimmed.slice(0, separatorIndex).trim();
+      if (!key || process.env[key] !== undefined) {
+        continue;
+      }
+
+      let value = trimmed.slice(separatorIndex + 1).trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+
+      process.env[key] = value;
+    }
+  } catch {
+    // No env file present in this environment.
+  }
+}
+
+const projectRoot = path.resolve(process.cwd());
+await loadEnvFile(path.join(projectRoot, ".env"));
+await loadEnvFile(path.join(projectRoot, ".env.local"));
 
 const port = Number(process.env.API_PORT || 8787);
 

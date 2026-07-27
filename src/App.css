@@ -77,21 +77,77 @@
   align-items: center;
   justify-content: center;
   gap: 0.22rem;
-  width: 3rem;
-  height: 3rem;
+  width: 3.25rem;
+  height: 3.25rem;
   padding: 0;
-  border: 1px solid rgba(11, 19, 43, 0.12);
+  border: 1px solid rgba(11, 19, 43, 0.14);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.85);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 244, 252, 0.96));
+  box-shadow: 0 12px 28px rgba(16, 24, 40, 0.12);
   cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
-.menu-button span {
-  width: 1.15rem;
+.menu-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 32px rgba(16, 24, 40, 0.16);
+}
+
+.menu-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.menu-icon span {
+  position: absolute;
+  left: 0;
+  width: 100%;
   height: 2px;
   border-radius: 999px;
   background: #0b1734;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transition: transform 0.22s ease, opacity 0.18s ease, top 0.22s ease;
+}
+
+.menu-icon span:nth-child(1) {
+  top: 0.05rem;
+}
+
+.menu-icon span:nth-child(2) {
+  top: 0.64rem;
+}
+
+.menu-icon span:nth-child(3) {
+  top: 1.23rem;
+}
+
+.menu-icon.open span:nth-child(1) {
+  top: 0.64rem;
+  transform: rotate(45deg);
+}
+
+.menu-icon.open span:nth-child(2) {
+  opacity: 0;
+}
+
+.menu-icon.open span:nth-child(3) {
+  top: 0.64rem;
+  transform: rotate(-45deg);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .nav {

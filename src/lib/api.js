@@ -39,6 +39,13 @@ export function verifyCourseCheckout(data) {
   });
 }
 
+export function getCourseMedia(courseSlug) {
+  return requestJson("/course-media", {
+    method: "POST",
+    body: JSON.stringify({ courseSlug }),
+  });
+}
+
 export function getApiBaseUrl() {
   return apiBaseUrl;
 }

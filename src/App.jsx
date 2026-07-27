@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { enrollLearner, startCourseCheckout, verifyCourseCheckout } from "./lib/api";
+import { enrollLearner, getCourseMedia, startCourseCheckout, verifyCourseCheckout } from "./lib/api";
 import "./App.css";
 
 const courses = [
@@ -237,6 +237,8 @@ function App() {
   const [paymentNotice, setPaymentNotice] = useState(getPaymentNoticeFromUrl);
   const [unlocks, setUnlocks] = useState(() => readUnlocks());
   const [currentLearner, setCurrentLearner] = useState(() => readLearner());
+  const [courseMedia, setCourseMedia] = useState(null);
+  const [courseMediaStatus, setCourseMediaStatus] = useState("idle");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -258,6 +260,22 @@ function App() {
   const unlockedCount = useMemo(() => Object.values(unlocks).filter(Boolean).length, [unlocks]);
   const premiumUnlocked = Boolean(unlocks["advanced-projects"] || currentLearner?.accessLevel === "premium");
   const activeLearner = currentLearner || readLearner();
+
+  function goToSignup() {
+    if (currentLearner) {
+      setFormData((current) => ({
+        ...current,
+        name: currentLearner.name || current.name,
+        email: currentLearner.email || current.email,
+        course: currentLearner.course || current.course,
+      }));
+    }
+
+    navigate("/");
+    window.setTimeout(() => {
+      document.getElementById("signup-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
 
   function navigate(path) {
     if (typeof window === "undefined") {
@@ -345,6 +363,52 @@ function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (route.page !== "course-detail") {
+      return;
+    }
+
+    const course = getCourseBySlug(route.courseSlug);
+    const canAccess = !course || course.accessLevel !== "premium" || Boolean(unlocks[route.courseSlug] || currentLearner?.accessLevel === "premium");
+    let active = true;
+
+    if (!course) {
+      return;
+    }
+
+    if (!canAccess && course.accessLevel === "premium") {
+      return;
+    }
+
+    async function loadCourseMedia() {
+      try {
+        setCourseMediaStatus("loading");
+        const media = await getCourseMedia(route.courseSlug);
+
+        if (!active) {
+          return;
+        }
+
+        setCourseMedia(media);
+        setCourseMediaStatus("ready");
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        setCourseMedia(null);
+        setCourseMediaStatus("error");
+        setPaymentNotice(error.message);
+      }
+    }
+
+    loadCourseMedia();
+
+    return () => {
+      active = false;
+    };
+  }, [route.page, route.courseSlug, unlocks, currentLearner?.accessLevel]);
 
   function handleSubmit(event) {
     event.preventDefault();
@@ -460,10 +524,13 @@ function App() {
           onClick={() => setMenuOpen((value) => !value)}
           aria-expanded={menuOpen}
           aria-controls="site-nav"
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
         >
-          <span />
-          <span />
-          <span />
+          <span className={`menu-icon ${menuOpen ? "open" : ""}`} aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
         </button>
 
         {route.page === "home" ? homeNav : appNav}
@@ -582,7 +649,7 @@ function App() {
                 </div>
               </article>
 
-              <article className="form-panel">
+              <article className="form-panel" id="signup-form">
                 <div className="form-panel-head">
                   <p className="eyebrow">Enrollment</p>
                   <h3>Reserve your seat and create your learner profile</h3>
@@ -635,7 +702,11 @@ function App() {
                   </label>
 
                   <button className="primary-btn form-button" type="submit" disabled={enrollmentStatus === "loading"}>
-                    {enrollmentStatus === "loading" ? "Sending..." : "Submit Interest"}
+                    {enrollmentStatus === "loading"
+                      ? "Sending..."
+                      : currentLearner
+                        ? "Update Interest"
+                        : "Submit Interest"}
                   </button>
                 </form>
 
@@ -644,7 +715,7 @@ function App() {
                 ) : (
                   <p className="form-status">
                     Free learners get instant access to basics. Premium learners can unlock advanced content later
-                    with payment.
+                    with payment. If you already have a profile, this form updates it instead of creating a new one.
                   </p>
                 )}
               </article>
@@ -760,7 +831,7 @@ function App() {
                     onClick={() => {
                       clearLearner();
                       setCurrentLearner(null);
-                      navigate("/");
+                      goToSignup();
                     }}
                   >
                     Sign out
@@ -776,7 +847,7 @@ function App() {
                   status here.
                 </p>
                 <div className="profile-actions">
-                  <button className="primary-btn" type="button" onClick={() => navigate("/")}>
+                  <button className="primary-btn" type="button" onClick={goToSignup}>
                     Go to signup
                   </button>
                 </div>
@@ -911,10 +982,20 @@ function App() {
           </div>
 
           <div className="lesson-video-slot">
-            {canAccess ? (
+            {canAccess && courseMediaStatus === "ready" && courseMedia?.playbackUrl ? (
               <video autoPlay muted loop playsInline poster="/images/logo-transparent.png">
-                <source src="/videos/Faith%20Tech%20Intro%202.mp4" type="video/mp4" />
+                <source src={courseMedia.playbackUrl} type="video/mp4" />
               </video>
+            ) : canAccess && courseMediaStatus === "loading" ? (
+              <div className="locked-state">
+                <p className="eyebrow">Loading lesson</p>
+                <h3>Fetching the video from Supabase Storage.</h3>
+              </div>
+            ) : canAccess && courseMediaStatus === "error" ? (
+              <div className="locked-state">
+                <p className="eyebrow">Lesson unavailable</p>
+                <h3>We could not load this course video yet.</h3>
+              </div>
             ) : (
               <div className="locked-state">
                 <p className="eyebrow">Locked lesson</p>

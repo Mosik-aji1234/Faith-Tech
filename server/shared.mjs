@@ -5,6 +5,8 @@ import path from "node:path";
 const storageDir = path.resolve(process.cwd(), "data");
 const enrollmentFile = path.join(storageDir, "enrollments.json");
 const learnerProfileFile = path.join(storageDir, "learner-profiles.json");
+const defaultFreeVideoBucket = "faith-tech-free-videos";
+const defaultPremiumVideoBucket = "faith-tech-premium-videos";
 
 const premiumCourses = {
   "advanced-projects": {
@@ -12,6 +14,41 @@ const premiumCourses = {
     amountKobo: 2500000,
     currency: "NGN",
     accessLevel: "premium",
+    bucket: defaultPremiumVideoBucket,
+    videoPath: "advanced-projects/lesson-1.mp4",
+  },
+};
+
+const courseMediaMap = {
+  "3d-cad-modeling": {
+    accessLevel: "free",
+    bucket: defaultFreeVideoBucket,
+    videoPath: "3d-cad-modeling/lesson-1.mp4",
+  },
+  assemblies: {
+    accessLevel: "free",
+    bucket: defaultFreeVideoBucket,
+    videoPath: "assemblies/lesson-1.mp4",
+  },
+  "surface-modelling": {
+    accessLevel: "free",
+    bucket: defaultFreeVideoBucket,
+    videoPath: "surface-modelling/lesson-1.mp4",
+  },
+  simulation: {
+    accessLevel: "free",
+    bucket: defaultFreeVideoBucket,
+    videoPath: "simulation/lesson-1.mp4",
+  },
+  "technical-drawing": {
+    accessLevel: "free",
+    bucket: defaultFreeVideoBucket,
+    videoPath: "technical-drawing/lesson-1.mp4",
+  },
+  "advanced-projects": {
+    accessLevel: "premium",
+    bucket: defaultPremiumVideoBucket,
+    videoPath: "advanced-projects/lesson-1.mp4",
   },
 };
 
@@ -65,6 +102,47 @@ function getSiteUrl(env, origin) {
   return (env.PUBLIC_SITE_URL || origin || "http://localhost:5173").replace(/\/$/, "");
 }
 
+function getSupabaseApiRoot(env) {
+  return (env.SUPABASE_URL || "").replace(/\/$/, "");
+}
+
+function getVideoBucketName(courseSlug, env) {
+  const media = courseMediaMap[courseSlug];
+
+  if (!media) {
+    return null;
+  }
+
+  if (media.accessLevel === "premium") {
+    return env.SUPABASE_PREMIUM_VIDEO_BUCKET || media.bucket;
+  }
+
+  return env.SUPABASE_FREE_VIDEO_BUCKET || media.bucket;
+}
+
+function buildPublicVideoUrl(env, bucketName, videoPath) {
+  return `${getSupabaseApiRoot(env)}/storage/v1/object/public/${encodeURIComponent(bucketName)}/${videoPath}`;
+}
+
+function getCourseMediaRecord(courseSlug, env, origin) {
+  const media = courseMediaMap[courseSlug];
+
+  if (!media) {
+    return null;
+  }
+
+  const bucket = getVideoBucketName(courseSlug, env);
+
+  return {
+    ...media,
+    bucket,
+    apiRoot: getSupabaseApiRoot(env),
+    siteUrl: getSiteUrl(env, origin),
+    playbackUrl: media.accessLevel === "free" ? buildPublicVideoUrl(env, bucket, media.videoPath) : null,
+    requiresSignature: media.accessLevel === "premium",
+  };
+}
+
 async function readJsonFile(filePath, fallback) {
   try {
     const content = await readFile(filePath, "utf8");
@@ -79,55 +157,89 @@ async function writeJsonFile(filePath, data) {
   await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 }
 
-async function persistEnrollment(record, env) {
+async function findSupabaseRecordByEmail(tableName, email, env) {
   const serviceKey = getSupabaseServiceKey(env);
 
-  if (env.SUPABASE_URL && serviceKey) {
-    const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/enrollments`, {
-      method: "POST",
+  if (!env.SUPABASE_URL || !serviceKey) {
+    return null;
+  }
+
+  const response = await fetch(
+    `${getSupabaseApiRoot(env)}/rest/v1/${tableName}?email=eq.${encodeURIComponent(email)}&select=*`,
+    {
       headers: {
         apikey: serviceKey,
         Authorization: `Bearer ${serviceKey}`,
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
       },
-      body: JSON.stringify(record),
-    });
+    },
+  );
 
-    if (!response.ok) {
-      throw new Error(`Supabase insert failed: ${await response.text()}`);
-    }
+  if (!response.ok) {
+    return null;
+  }
 
-    return { provider: "supabase" };
+  const payload = await response.json();
+  return Array.isArray(payload) && payload.length > 0 ? payload[0] : null;
+}
+
+async function upsertSupabaseRecord(tableName, email, record, env) {
+  const serviceKey = getSupabaseServiceKey(env);
+
+  if (!env.SUPABASE_URL || !serviceKey) {
+    return { provider: "disabled", record: null };
+  }
+
+  const existingRecord = await findSupabaseRecordByEmail(tableName, email, env);
+  const endpoint = existingRecord?.id
+    ? `${getSupabaseApiRoot(env)}/rest/v1/${tableName}?id=eq.${encodeURIComponent(existingRecord.id)}`
+    : `${getSupabaseApiRoot(env)}/rest/v1/${tableName}`;
+  const method = existingRecord?.id ? "PATCH" : "POST";
+  const requestBody = existingRecord?.id
+    ? (({ id, ...rest }) => rest)(record)
+    : record;
+
+  const response = await fetch(endpoint, {
+    method,
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Supabase ${tableName} save failed: ${await response.text()}`);
+  }
+
+  const responsePayload = await response.json();
+
+  return {
+    provider: "supabase",
+    record: Array.isArray(responsePayload) ? responsePayload[0] || null : responsePayload || null,
+    existing: Boolean(existingRecord?.id),
+  };
+}
+
+async function persistEnrollment(record, env) {
+  if (env.SUPABASE_URL && getSupabaseServiceKey(env)) {
+    return upsertSupabaseRecord("enrollments", record.email, record, env);
   }
 
   const items = await readJsonFile(enrollmentFile, []);
-  items.unshift(record);
-  await writeJsonFile(enrollmentFile, items);
+  const next = [
+    record,
+    ...items.filter((item) => item.email !== record.email),
+  ];
+  await writeJsonFile(enrollmentFile, next);
 
-  return { provider: "local-file" };
+  return { provider: "local-file", existing: items.some((item) => item.email === record.email), record };
 }
 
 async function persistLearnerProfile(record, env) {
-  const serviceKey = getSupabaseServiceKey(env);
-
-  if (env.SUPABASE_URL && serviceKey) {
-    const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/learner_profiles?on_conflict=email`, {
-      method: "POST",
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-        "Content-Type": "application/json",
-        Prefer: "resolution=merge-duplicates,return=representation",
-      },
-      body: JSON.stringify(record),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Supabase learner profile insert failed: ${await response.text()}`);
-    }
-
-    return { provider: "supabase" };
+  if (env.SUPABASE_URL && getSupabaseServiceKey(env)) {
+    return upsertSupabaseRecord("learner_profiles", record.email, record, env);
   }
 
   const items = await readJsonFile(learnerProfileFile, []);
@@ -137,7 +249,39 @@ async function persistLearnerProfile(record, env) {
   ];
   await writeJsonFile(learnerProfileFile, next);
 
-  return { provider: "local-file" };
+  return { provider: "local-file", existing: items.some((item) => item.email === record.email), record };
+}
+
+async function createSignedVideoUrl(courseSlug, env) {
+  const media = courseMediaMap[courseSlug];
+  const serviceKey = getSupabaseServiceKey(env);
+
+  if (!media || !serviceKey || !env.SUPABASE_URL) {
+    return null;
+  }
+
+  const bucketName = getVideoBucketName(courseSlug, env);
+  const response = await fetch(
+    `${getSupabaseApiRoot(env)}/storage/v1/object/sign/${encodeURIComponent(bucketName)}/${media.videoPath}`,
+    {
+      method: "POST",
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ expiresIn: 3600 }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Supabase signed video URL failed: ${await response.text()}`);
+  }
+
+  const payload = await response.json();
+  const signedPath = payload.signedURL || payload.signedUrl || "";
+
+  return signedPath ? `${getSupabaseApiRoot(env)}${signedPath}` : null;
 }
 
 async function findSupabaseUserByEmail(email, env) {
@@ -425,6 +569,7 @@ export async function handleApiRequest({ method, pathname, body, headers, env, o
     };
 
     const profileStorage = await persistLearnerProfile(profileRecord, env);
+    const storedProfileId = profileStorage.record?.id || profileRecord.id;
     const stored = await persistEnrollment(
       {
         id: record.id,
@@ -434,7 +579,7 @@ export async function handleApiRequest({ method, pathname, body, headers, env, o
         created_at: record.createdAt,
         status: record.status,
         source: record.source,
-        profile_id: profileRecord.id,
+        profile_id: storedProfileId,
         auth_user_id: authUser.userId,
       },
       env,
@@ -450,6 +595,26 @@ export async function handleApiRequest({ method, pathname, body, headers, env, o
       email: emailResult.provider,
       authProvider: authUser.provider,
       accessLevel,
+    });
+  }
+
+  if (method === "POST" && pathname === "/api/course-media") {
+    const courseSlug = slugify(requestBody.courseSlug || "");
+    const course = getCourseMediaRecord(courseSlug, env, origin);
+
+    if (!course) {
+      return jsonResponse(404, { error: "That course does not have media configured yet." });
+    }
+
+    if (course.accessLevel === "free") {
+      return jsonResponse(200, course);
+    }
+
+    const playbackUrl = await createSignedVideoUrl(courseSlug, env);
+
+    return jsonResponse(200, {
+      ...course,
+      playbackUrl,
     });
   }
 

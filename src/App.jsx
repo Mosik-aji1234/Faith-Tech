@@ -8,37 +8,55 @@ const courses = [
     description: "Create clean parts, product concepts, and design foundations.",
     tag: "Free",
     slug: "3d-cad-modeling",
+    accessLevel: "free",
+    lessonCount: 3,
   },
   {
     title: "Assemblies",
     description: "Bring multiple parts together and understand how products fit.",
     tag: "Free",
     slug: "assemblies",
+    accessLevel: "free",
+    lessonCount: 3,
   },
   {
     title: "Surface Modelling",
     description: "Shape smooth, advanced geometry for premium design work.",
     tag: "Free",
     slug: "surface-modelling",
+    accessLevel: "free",
+    lessonCount: 3,
   },
   {
     title: "Simulation",
     description: "Test strength, fit, and performance before production.",
     tag: "Free",
     slug: "simulation",
+    accessLevel: "free",
+    lessonCount: 3,
   },
   {
     title: "Technical Drawing",
     description: "Produce detailed drawings that can move straight into manufacturing.",
     tag: "Free",
     slug: "technical-drawing",
+    accessLevel: "free",
+    lessonCount: 3,
   },
   {
     title: "Advanced Projects",
     description: "Work through guided projects that feel like real industry tasks.",
     tag: "Premium",
     slug: "advanced-projects",
+    accessLevel: "premium",
+    lessonCount: 4,
   },
+];
+
+const routeTabs = [
+  { label: "Home", path: "/" },
+  { label: "Dashboard", path: "/dashboard" },
+  { label: "Learning Center", path: "/learning-center" },
 ];
 
 const steps = [
@@ -49,6 +67,80 @@ const steps = [
 
 const courseOptions = courses.map((course) => course.title);
 const unlockStorageKey = "faith-tech-course-unlocks";
+const learnerStorageKey = "faith-tech-current-learner";
+
+const learningModules = {
+  "3d-cad-modeling": [
+    "Sketch fundamentals and constraints",
+    "Extrude, cut, and shape clean parts",
+    "Create your first production-ready part",
+  ],
+  assemblies: [
+    "Mate parts together correctly",
+    "Understand assembly structure",
+    "Build simple mechanisms",
+  ],
+  "surface-modelling": [
+    "Blend shapes and guide curves",
+    "Refine smooth surfaces for premium products",
+    "Prepare export-ready geometry",
+  ],
+  simulation: [
+    "Set up loads and fixtures",
+    "Interpret stress and deformation results",
+    "Improve model performance before production",
+  ],
+  "technical-drawing": [
+    "Create front, top, and sectional views",
+    "Add dimensions and annotations",
+    "Prepare drawings for manufacturing handoff",
+  ],
+  "advanced-projects": [
+    "Build a full product from concept to finish",
+    "Work with advanced modeling workflows",
+    "Deliver a portfolio-worthy project",
+    "Apply premium course feedback loops",
+  ],
+};
+
+function normalizePath(pathname) {
+  const value = String(pathname || "/").trim();
+  if (!value || value === "/") {
+    return "/";
+  }
+
+  return `/${value.replace(/^\/+|\/+$/g, "")}`;
+}
+
+function getCurrentPath() {
+  if (typeof window === "undefined") {
+    return "/";
+  }
+
+  return normalizePath(window.location.pathname);
+}
+
+function getRoute(pathname) {
+  const segments = normalizePath(pathname).split("/").filter(Boolean);
+
+  if (segments.length === 0) {
+    return { page: "home" };
+  }
+
+  if (segments[0] === "dashboard") {
+    return { page: "dashboard" };
+  }
+
+  if (segments[0] === "learning-center") {
+    if (segments.length === 1) {
+      return { page: "learning-center" };
+    }
+
+    return { page: "course-detail", courseSlug: segments[1] };
+  }
+
+  return { page: "home" };
+}
 
 function getPaymentNoticeFromUrl() {
   if (typeof window === "undefined") {
@@ -96,13 +188,55 @@ function saveUnlock(courseSlug, value) {
   window.localStorage.setItem(unlockStorageKey, JSON.stringify(next));
 }
 
+function readLearner() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return JSON.parse(window.localStorage.getItem(learnerStorageKey) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function saveLearner(learner) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(learnerStorageKey, JSON.stringify(learner));
+}
+
+function clearLearner() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(learnerStorageKey);
+}
+
+function getCourseBySlug(slug) {
+  return courses.find((course) => course.slug === slug) || null;
+}
+
+function getTrackCourses(level) {
+  return courses.filter((course) => course.accessLevel === level);
+}
+
+function getLessonModules(courseSlug) {
+  return learningModules[courseSlug] || [];
+}
+
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pathname, setPathname] = useState(() => getCurrentPath());
   const [enrollmentStatus, setEnrollmentStatus] = useState("idle");
   const [enrollmentNotice, setEnrollmentNotice] = useState("");
   const [paymentStatus, setPaymentStatus] = useState(getPaymentStatusFromUrl);
   const [paymentNotice, setPaymentNotice] = useState(getPaymentNoticeFromUrl);
   const [unlocks, setUnlocks] = useState(() => readUnlocks());
+  const [currentLearner, setCurrentLearner] = useState(() => readLearner());
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -118,12 +252,45 @@ function App() {
     instagram: "https://instagram.com/faithtechacademy",
     linkedin: "https://linkedin.com/in/faithtechacademy",
   };
-  const checkoutEmail = formData.email.trim();
 
-  const unlockedCount = useMemo(
-    () => Object.values(unlocks).filter(Boolean).length,
-    [unlocks],
-  );
+  const route = useMemo(() => getRoute(pathname), [pathname]);
+  const checkoutEmail = formData.email.trim();
+  const unlockedCount = useMemo(() => Object.values(unlocks).filter(Boolean).length, [unlocks]);
+  const premiumUnlocked = Boolean(unlocks["advanced-projects"] || currentLearner?.accessLevel === "premium");
+  const activeLearner = currentLearner || readLearner();
+
+  function navigate(path) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const normalized = normalizePath(path);
+    window.history.pushState({}, "", normalized);
+    setPathname(normalized);
+    setMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function updateLearnerAccess(level) {
+    if (!activeLearner) {
+      return;
+    }
+
+    const nextLearner = {
+      ...activeLearner,
+      accessLevel: level,
+      status: level,
+    };
+
+    setCurrentLearner(nextLearner);
+    saveLearner(nextLearner);
+  }
+
+  useEffect(() => {
+    const onPopState = () => setPathname(getCurrentPath());
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -149,14 +316,16 @@ function App() {
           const courseSlug = result.courseSlug || result.course?.slug || course;
           saveUnlock(courseSlug, true);
           setUnlocks(readUnlocks());
-          setPaymentNotice(
-            `${result.courseTitle || course} is now unlocked. You can add the course video next.`,
-          );
+          setPaymentNotice(`${result.courseTitle || course} is now unlocked.`);
           setPaymentStatus("success");
+
+          if (courseSlug === "advanced-projects") {
+            updateLearnerAccess("premium");
+          }
+
+          navigate(`/learning-center/${courseSlug}`);
         } else {
-          setPaymentNotice(
-            "Payment verification is still pending. Check the Paystack settings on the server.",
-          );
+          setPaymentNotice("Payment verification is still pending. Check the Paystack settings on the server.");
           setPaymentStatus("error");
         }
       } catch (error) {
@@ -174,6 +343,7 @@ function App() {
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleSubmit(event) {
@@ -183,8 +353,21 @@ function App() {
 
     enrollLearner(formData)
       .then((result) => {
+        const nextLearner = {
+          name: formData.name,
+          email: formData.email,
+          course: formData.course,
+          profileId: result.profileId,
+          enrollmentId: result.enrollmentId,
+          accessLevel: result.accessLevel || "free",
+          status: result.accessLevel || "free",
+        };
+
+        setCurrentLearner(nextLearner);
+        saveLearner(nextLearner);
         setEnrollmentStatus("success");
         setEnrollmentNotice(`${result.message} Access level: ${result.accessLevel || "free"}.`);
+        navigate("/dashboard");
       })
       .catch((error) => {
         setEnrollmentStatus("error");
@@ -204,11 +387,10 @@ function App() {
   }
 
   async function handlePremiumAccess(course) {
-    const isUnlocked = unlocks[course.slug];
+    const isUnlocked = unlocks[course.slug] || currentLearner?.accessLevel === "premium";
 
     if (isUnlocked) {
-      setPaymentNotice(`${course.title} is unlocked. Add the lesson video when ready.`);
-      setPaymentStatus("success");
+      navigate(`/learning-center/${course.slug}`);
       return;
     }
 
@@ -233,22 +415,44 @@ function App() {
       }
 
       setPaymentStatus("error");
-      setPaymentNotice(
-        "Paystack is not configured yet. Add PAYSTACK_SECRET_KEY and PUBLIC_SITE_URL on the server to enable checkout.",
-      );
+      setPaymentNotice("Paystack is not configured yet. Add PAYSTACK_SECRET_KEY and PUBLIC_SITE_URL on the server to enable checkout.");
     } catch (error) {
       setPaymentStatus("error");
       setPaymentNotice(error.message);
     }
   }
 
-  return (
-    <div className="page-shell">
+  function renderHeader() {
+    const homeNav = (
+      <nav id="site-nav" className={`nav ${menuOpen ? "nav-open" : ""}`}>
+        <a href="#home" onClick={() => setMenuOpen(false)}>
+          Home
+        </a>
+        <a href="#about" onClick={() => setMenuOpen(false)}>
+          About
+        </a>
+        <a href="#courses" onClick={() => setMenuOpen(false)}>
+          Courses
+        </a>
+      </nav>
+    );
+
+    const appNav = (
+      <nav id="site-nav" className={`nav ${menuOpen ? "nav-open" : ""}`}>
+        {routeTabs.map((tab) => (
+          <button key={tab.path} type="button" className="nav-button" onClick={() => navigate(tab.path)}>
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+    );
+
+    return (
       <header className="topbar">
-        <a className="brand" href="#home" onClick={() => setMenuOpen(false)}>
+        <button className="brand brand-button" type="button" onClick={() => navigate("/")}>
           <img src="/images/logo-transparent.png" alt="Faith Tech logo" />
           <span>Faith Tech</span>
-        </a>
+        </button>
 
         <button
           className="menu-button"
@@ -262,37 +466,30 @@ function App() {
           <span />
         </button>
 
-        <nav id="site-nav" className={`nav ${menuOpen ? "nav-open" : ""}`}>
-          <a href="#home" onClick={() => setMenuOpen(false)}>
-            Home
-          </a>
-          <a href="#about" onClick={() => setMenuOpen(false)}>
-            About
-          </a>
-          <a href="#courses" onClick={() => setMenuOpen(false)}>
-            Courses
-          </a>
-        </nav>
+        {route.page === "home" ? homeNav : appNav}
       </header>
+    );
+  }
 
-      <main>
+  function renderHome() {
+    return (
+      <>
         <section id="home" className="hero section">
           <div className="hero-copy">
             <p className="eyebrow">SolidWorks Academy</p>
             <h1>Build from basics to advanced with a clean SolidWorks learning path.</h1>
             <p className="hero-text">
-              Faith Tech is an academy-style landing page for learners who want practical
-              CAD training without clutter. The experience stays simple, modern, and easy
-              to navigate on every device.
+              Faith Tech is an academy-style landing page for learners who want practical CAD training without clutter.
+              The experience stays simple, modern, and easy to navigate on every device.
             </p>
 
             <div className="hero-actions">
-              <a className="primary-btn" href="#courses">
-                Explore Courses
-              </a>
-              <a className="secondary-btn" href="#about">
-                Reserve a Seat
-              </a>
+              <button className="primary-btn" type="button" onClick={() => navigate("/learning-center")}>
+                Explore Learning Center
+              </button>
+              <button className="secondary-btn" type="button" onClick={() => navigate("/dashboard")}>
+                View Dashboard
+              </button>
             </div>
 
             <ul className="highlights">
@@ -338,13 +535,12 @@ function App() {
           <div className="about-grid">
             <article className="about-panel">
               <p>
-                Faith Tech is shaped like a focused learning academy. The layout keeps only
-                three core sections so users can move quickly from the hero into course
-                discovery and enrollment.
+                Faith Tech is shaped like a focused learning academy. The layout keeps only three core sections so
+                users can move quickly from the hero into course discovery and enrollment.
               </p>
               <p>
-                This version also blends the branding into the page better, so the logo no
-                longer feels boxed off from the rest of the design.
+                This version also blends the branding into the page better, so the logo no longer feels boxed off
+                from the rest of the design.
               </p>
 
               <ul className="steps-list">
@@ -390,10 +586,7 @@ function App() {
                 <div className="form-panel-head">
                   <p className="eyebrow">Enrollment</p>
                   <h3>Reserve your seat and create your learner profile</h3>
-                  <p>
-                    Submit your details, set a password, and we’ll create your learner profile
-                    right away.
-                  </p>
+                  <p>Submit your details, set a password, and we’ll create your learner profile right away.</p>
                 </div>
 
                 <form className="enrollment-form" onSubmit={handleSubmit}>
@@ -437,27 +630,21 @@ function App() {
                         <option key={course} value={course}>
                           {course}
                         </option>
-                    ))}
-                  </select>
+                      ))}
+                    </select>
                   </label>
 
-                  <button
-                    className="primary-btn form-button"
-                    type="submit"
-                    disabled={enrollmentStatus === "loading"}
-                  >
+                  <button className="primary-btn form-button" type="submit" disabled={enrollmentStatus === "loading"}>
                     {enrollmentStatus === "loading" ? "Sending..." : "Submit Interest"}
                   </button>
                 </form>
 
                 {enrollmentNotice ? (
-                  <p className="form-status success">
-                    {enrollmentNotice}
-                  </p>
+                  <p className="form-status success">{enrollmentNotice}</p>
                 ) : (
                   <p className="form-status">
-                    Free learners get instant access to basics. Premium learners can unlock
-                    advanced content later with payment.
+                    Free learners get instant access to basics. Premium learners can unlock advanced content later
+                    with payment.
                   </p>
                 )}
               </article>
@@ -480,24 +667,17 @@ function App() {
           <div className="course-grid">
             {courses.map((course) => {
               const isPremium = course.tag === "Premium";
-              const isUnlocked = Boolean(unlocks[course.slug]);
+              const isUnlocked = Boolean(unlocks[course.slug] || currentLearner?.accessLevel === "premium");
 
               return (
-                <article
-                  className={`course-card ${isPremium ? "premium" : ""} ${isUnlocked ? "unlocked" : ""}`}
-                  key={course.title}
-                >
+                <article className={`course-card ${isPremium ? "premium" : ""} ${isUnlocked ? "unlocked" : ""}`} key={course.title}>
                   <div className="course-card-top">
-                    <span>
-                      {isPremium
-                        ? `${isUnlocked ? "Unlocked" : "Premium"} • ₦25,000`
-                        : course.tag}
-                    </span>
+                    <span>{isPremium ? `${isUnlocked ? "Unlocked" : "Premium"} • ₦25,000` : course.tag}</span>
                   </div>
                   <h3>{course.title}</h3>
                   <p>{course.description}</p>
 
-                {isPremium ? (
+                  {isPremium ? (
                     <button
                       className="course-link course-button"
                       type="button"
@@ -506,9 +686,9 @@ function App() {
                       {isUnlocked ? "Open lesson" : "Unlock with Paystack"}
                     </button>
                   ) : (
-                    <a className="course-link" href="#about">
+                    <button className="course-link" type="button" onClick={() => navigate(`/learning-center/${course.slug}`)}>
                       Start free basics
-                    </a>
+                    </button>
                   )}
                 </article>
               );
@@ -516,17 +696,282 @@ function App() {
           </div>
 
           {paymentNotice ? (
-            <p className={`course-notice ${paymentStatus === "success" ? "success" : ""}`}>
-              {paymentNotice}
-            </p>
+            <p className={`course-notice ${paymentStatus === "success" ? "success" : ""}`}>{paymentNotice}</p>
           ) : null}
         </section>
+      </>
+    );
+  }
+
+  function renderDashboard() {
+    const learner = activeLearner;
+    const accessLevel = learner?.accessLevel || "free";
+    const profileCourse = learner?.course || "3D CAD Modeling";
+
+    return (
+      <section className="dashboard-page section">
+        <div className="section-heading">
+          <p className="eyebrow">Profile Dashboard</p>
+          <h2>Your learner profile and access status.</h2>
+        </div>
+
+        <div className="dashboard-layout">
+          <article className="dashboard-panel profile-panel">
+            {learner ? (
+              <>
+                <div className="profile-head">
+                  <div>
+                    <p className="eyebrow">Current learner</p>
+                    <h3>{learner.name}</h3>
+                    <p className="profile-email">{learner.email}</p>
+                  </div>
+                  <span className={`status-pill ${accessLevel}`}>{accessLevel}</span>
+                </div>
+
+                <dl className="profile-list">
+                  <div>
+                    <dt>Course</dt>
+                    <dd>{profileCourse}</dd>
+                  </div>
+                  <div>
+                    <dt>Status</dt>
+                    <dd>{accessLevel === "premium" ? "Pro learner" : "Free learner"}</dd>
+                  </div>
+                  <div>
+                    <dt>Profile ID</dt>
+                    <dd>{learner.profileId || "Pending"}</dd>
+                  </div>
+                  <div>
+                    <dt>Access</dt>
+                    <dd>{accessLevel === "premium" ? "All premium modules unlocked" : "Free basics available"}</dd>
+                  </div>
+                </dl>
+
+                <div className="profile-actions">
+                  <button className="primary-btn" type="button" onClick={() => navigate("/learning-center")}>
+                    Open learning center
+                  </button>
+                  <button className="secondary-btn" type="button" onClick={() => navigate("/learning-center")}>
+                    View course list
+                  </button>
+                  <button
+                    className="secondary-btn"
+                    type="button"
+                    onClick={() => {
+                      clearLearner();
+                      setCurrentLearner(null);
+                      navigate("/");
+                    }}
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="eyebrow">No learner loaded</p>
+                <h3>Reserve your seat to create a learner profile.</h3>
+                <p className="profile-empty-copy">
+                  Once a learner is created on this device, the dashboard will show their free or premium access
+                  status here.
+                </p>
+                <div className="profile-actions">
+                  <button className="primary-btn" type="button" onClick={() => navigate("/")}>
+                    Go to signup
+                  </button>
+                </div>
+              </>
+            )}
+          </article>
+
+          <article className="dashboard-panel stats-panel">
+            <p className="eyebrow">Learning status</p>
+            <h3>What the profile now unlocks</h3>
+            <ul className="dashboard-list">
+              <li>Free basics for all learners</li>
+              <li>Premium module unlocks after payment</li>
+              <li>Lesson pages for each course</li>
+              <li>Future video uploads inside the learning center</li>
+            </ul>
+
+            <div className="stats-grid">
+              <div>
+                <span>{getTrackCourses("free").length}</span>
+                <p>Free courses</p>
+              </div>
+              <div>
+                <span>{getTrackCourses("premium").length}</span>
+                <p>Premium courses</p>
+              </div>
+              <div>
+                <span>{unlockedCount}</span>
+                <p>Unlocked locally</p>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+    );
+  }
+
+  function renderCourseList(level, title, description) {
+    const trackCourses = getTrackCourses(level);
+
+    return (
+      <section className="track-section">
+        <div className="track-heading">
+          <div>
+            <p className="eyebrow">{title}</p>
+            <h3>{description}</h3>
+          </div>
+        </div>
+
+        <div className="track-grid">
+          {trackCourses.map((course) => {
+            const isUnlocked = Boolean(unlocks[course.slug] || currentLearner?.accessLevel === "premium");
+            return (
+              <article className={`track-card ${isUnlocked ? "unlocked" : ""}`} key={course.slug}>
+                <div className="track-card-top">
+                  <span>{course.tag}</span>
+                  <span>{course.lessonCount} lessons</span>
+                </div>
+                <h4>{course.title}</h4>
+                <p>{course.description}</p>
+                <button className="course-link" type="button" onClick={() => navigate(`/learning-center/${course.slug}`)}>
+                  {isUnlocked ? "Open lesson" : "Start learning"}
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    );
+  }
+
+  function renderLearningCenter() {
+    return (
+      <section className="learning-center-page section">
+        <div className="section-heading">
+          <p className="eyebrow">Learning Center</p>
+          <h2>Free and premium lessons live here.</h2>
+        </div>
+
+        <div className="center-banner">
+          <div>
+            <p className="eyebrow">Current profile</p>
+            <h3>{activeLearner ? activeLearner.name : "No learner profile loaded yet"}</h3>
+            <p>
+              {activeLearner
+                ? `${activeLearner.email} • ${activeLearner.accessLevel === "premium" ? "Pro learner" : "Free learner"}`
+                : "Create a profile from the homepage to unlock personalized learning content."}
+            </p>
+          </div>
+          <button className="secondary-btn" type="button" onClick={() => navigate("/dashboard")}>
+            View dashboard
+          </button>
+        </div>
+
+        {renderCourseList("free", "Free basics", "Start with the essentials and move lesson by lesson.")}
+        {renderCourseList("premium", "Premium modules", "Locked until payment unlocks the advanced lessons.")}
+      </section>
+    );
+  }
+
+  function renderCourseDetail(courseSlug) {
+    const course = getCourseBySlug(courseSlug) || getCourseBySlug("3d-cad-modeling");
+    const isPremium = course?.accessLevel === "premium";
+    const canAccess = !isPremium || premiumUnlocked;
+    const modules = getLessonModules(course?.slug);
+
+    if (!course) {
+      return null;
+    }
+
+    return (
+      <section className="course-detail-page section">
+        <div className="course-detail-back">
+          <button className="secondary-btn" type="button" onClick={() => navigate("/learning-center")}>
+            Back to learning center
+          </button>
+          <button className="secondary-btn" type="button" onClick={() => navigate("/dashboard")}>
+            View dashboard
+          </button>
+        </div>
+
+        <div className="course-detail-hero">
+          <div>
+            <p className="eyebrow">{isPremium ? "Premium lesson" : "Free lesson"}</p>
+            <h2>{course.title}</h2>
+            <p>{course.description}</p>
+            <div className="detail-pill-row">
+              <span className="status-pill free">{course.tag}</span>
+              <span className="status-pill">{course.lessonCount} lesson slots</span>
+              <span className="status-pill">{canAccess ? "Available" : "Locked"}</span>
+            </div>
+          </div>
+
+          <div className="lesson-video-slot">
+            {canAccess ? (
+              <video autoPlay muted loop playsInline poster="/images/logo-transparent.png">
+                <source src="/videos/Faith%20Tech%20Intro%202.mp4" type="video/mp4" />
+              </video>
+            ) : (
+              <div className="locked-state">
+                <p className="eyebrow">Locked lesson</p>
+                <h3>Unlock with Paystack to access this premium course.</h3>
+                <button className="primary-btn" type="button" onClick={() => handlePremiumAccess(course)}>
+                  Unlock course
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="lesson-layout">
+          <article className="lesson-panel">
+            <p className="eyebrow">Lesson path</p>
+            <h3>What learners will move through</h3>
+            <ol className="lesson-list">
+              {modules.map((module) => (
+                <li key={module}>{module}</li>
+              ))}
+            </ol>
+          </article>
+
+          <article className="lesson-panel">
+            <p className="eyebrow">Upload slot</p>
+            <h3>Where your future videos will live</h3>
+            <p>
+              This section is ready for the course video player, lesson notes, and downloadable files once you
+              upload them.
+            </p>
+            <div className="upload-slot">
+              <span>Course video placeholder</span>
+              <p>
+                Replace this with a stored lesson video, private embed, or secure media asset when you’re ready.
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <div className="page-shell">
+      {renderHeader()}
+
+      <main>
+        {route.page === "home" && renderHome()}
+        {route.page === "dashboard" && renderDashboard()}
+        {route.page === "learning-center" && renderLearningCenter()}
+        {route.page === "course-detail" && renderCourseDetail(route.courseSlug)}
       </main>
 
       <footer className="site-footer">
         <div>
           <p className="footer-motto">Turning Ideas into Innovation</p>
-          <p className="footer-copy">© 2026 designed by Sir-Frosh100</p>
+          <p className="footer-copy">© 2026 designed by SIRFROSH100</p>
         </div>
       </footer>
     </div>

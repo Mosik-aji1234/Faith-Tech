@@ -53,6 +53,18 @@
   text-transform: uppercase;
 }
 
+.brand-button,
+.nav-button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.brand-button {
+  padding: 0;
+}
+
 .brand img {
   width: 2.9rem;
   height: 2.9rem;
@@ -95,9 +107,21 @@
   transition: color 0.2s ease, transform 0.2s ease;
 }
 
+.nav-button {
+  padding: 0;
+  color: #243865;
+  font-weight: 700;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.nav-button:hover,
 .nav a:hover {
   color: #0c2d84;
   transform: translateY(-1px);
+}
+
+.page-shell main {
+  display: block;
 }
 
 .section {
@@ -613,6 +637,300 @@ button.course-link {
   color: #0f5132;
 }
 
+.dashboard-page,
+.learning-center-page,
+.course-detail-page {
+  padding-top: 1rem;
+}
+
+.dashboard-layout,
+.lesson-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.dashboard-panel,
+.track-card,
+.lesson-panel,
+.center-banner,
+.course-detail-hero,
+.locked-state,
+.upload-slot {
+  border: 1px solid rgba(14, 23, 48, 0.09);
+  box-shadow: 0 20px 45px rgba(14, 22, 46, 0.08);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.dashboard-panel,
+.track-card,
+.lesson-panel,
+.locked-state,
+.upload-slot {
+  padding: 1.35rem;
+}
+
+.profile-panel h3,
+.stats-panel h3,
+.track-heading h3,
+.lesson-panel h3,
+.course-detail-hero h2,
+.learning-center-page .section-heading h2 {
+  margin: 0;
+  color: #09152f;
+  font-family: "Arial Black", "Segoe UI Black", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: -0.05em;
+}
+
+.profile-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.profile-email {
+  margin: 0.35rem 0 0;
+  color: #506080;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.1rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(8, 29, 103, 0.08);
+  color: #081d67;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.status-pill.free {
+  background: rgba(16, 76, 47, 0.08);
+  color: #0f5132;
+}
+
+.status-pill.premium {
+  background: rgba(29, 84, 255, 0.12);
+  color: #163aa5;
+}
+
+.profile-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin: 1.2rem 0 0;
+}
+
+.profile-list div {
+  padding: 0.95rem;
+  border-radius: 18px;
+  background: rgba(246, 248, 252, 0.95);
+}
+
+.profile-list dt {
+  color: #698;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.profile-list dd {
+  margin: 0.35rem 0 0;
+  color: #0f1a39;
+  font-weight: 700;
+}
+
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.dashboard-list,
+.lesson-list {
+  margin: 1rem 0 0;
+  padding-left: 1.2rem;
+  color: #324164;
+  line-height: 1.7;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.stats-grid div {
+  padding: 1rem;
+  border-radius: 18px;
+  background: rgba(246, 248, 252, 0.95);
+  text-align: center;
+}
+
+.stats-grid span {
+  display: block;
+  color: #081d67;
+  font-family: "Arial Black", "Segoe UI Black", sans-serif;
+  font-size: 1.6rem;
+}
+
+.stats-grid p {
+  margin: 0.25rem 0 0;
+  color: #506080;
+}
+
+.center-banner,
+.course-detail-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.55fr);
+  gap: 1rem;
+  align-items: center;
+  padding: 1.35rem;
+  margin-bottom: 1rem;
+}
+
+.track-section {
+  margin-top: 1rem;
+}
+
+.track-heading {
+  margin-bottom: 1rem;
+}
+
+.track-heading h3 {
+  font-size: clamp(1.4rem, 2.7vw, 2rem);
+}
+
+.track-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.track-card {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.track-card.unlocked {
+  outline: 2px solid rgba(45, 212, 191, 0.28);
+}
+
+.track-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.track-card-top span {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(8, 29, 103, 0.08);
+  color: #081d67;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.track-card h4 {
+  margin: 0;
+  color: #09152f;
+  font-family: "Arial Black", "Segoe UI Black", sans-serif;
+  text-transform: uppercase;
+}
+
+.center-banner p {
+  margin: 0.35rem 0 0;
+  color: #425071;
+  line-height: 1.6;
+}
+
+.course-detail-back {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.detail-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.lesson-video-slot {
+  min-height: 320px;
+  overflow: hidden;
+  border-radius: 28px;
+  background: #081533;
+  box-shadow: 0 20px 45px rgba(14, 22, 46, 0.08);
+}
+
+.lesson-video-slot video {
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  display: block;
+  object-fit: cover;
+}
+
+.locked-state {
+  min-height: 320px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 0.75rem;
+  background: linear-gradient(135deg, rgba(8, 23, 68, 0.96), rgba(22, 69, 191, 0.92));
+  color: #fff;
+}
+
+.locked-state h3 {
+  margin: 0;
+  font-family: "Arial Black", "Segoe UI Black", sans-serif;
+  text-transform: uppercase;
+}
+
+.locked-state p {
+  color: #d6e2ff;
+}
+
+.upload-slot {
+  min-height: 180px;
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  background: rgba(246, 248, 252, 0.95);
+}
+
+.upload-slot span {
+  color: #081d67;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.upload-slot p {
+  margin: 0;
+  color: #465573;
+  line-height: 1.7;
+}
+
 .site-footer {
   width: min(1180px, calc(100% - 2rem));
   margin: 0 auto;
@@ -640,7 +958,12 @@ button.course-link {
 @media (max-width: 980px) {
   .hero,
   .about-grid,
-  .course-grid {
+  .course-grid,
+  .dashboard-layout,
+  .lesson-layout,
+  .center-banner,
+  .course-detail-hero,
+  .track-grid {
     grid-template-columns: 1fr;
   }
 
@@ -697,6 +1020,13 @@ button.course-link {
     background: rgba(255, 255, 255, 0.78);
   }
 
+  .nav-button {
+    padding: 0.8rem 0.95rem;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.78);
+    text-align: left;
+  }
+
   .hero-visual-grid {
     grid-template-columns: 1fr;
   }
@@ -725,5 +1055,10 @@ button.course-link {
   .secondary-btn,
   .course-link {
     width: 100%;
+  }
+
+  .profile-list,
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
 }

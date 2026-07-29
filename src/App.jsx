@@ -640,7 +640,7 @@ function App() {
 
         <section id="about" className="about section">
           <div className="section-heading">
-            <p className="eyebrow">About Faith Tech</p>
+            <p className="eyebrow">About Us</p>
             <h2>Simple structure, strong visuals, and a clean enrollment experience.</h2>
           </div>
 
@@ -777,7 +777,7 @@ function App() {
           <p className="courses-meta">
             {unlockedCount > 0
               ? `${unlockedCount} premium course${unlockedCount > 1 ? "s" : ""} unlocked locally.`
-              : "Premium access is ready for Paystack checkout at â‚¦25,000."}
+              : "Premium access is ready for Paystack checkout at ₦25,000."}
           </p>
 
           <div className="course-grid">

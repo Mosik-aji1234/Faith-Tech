@@ -223,11 +223,15 @@
   align-items: center;
   gap: 0.5rem;
   margin: 0 0 1rem;
-  color: rgba(233, 241, 255, 0.92);
+  color: #1640a7;
   font-size: 0.78rem;
   font-weight: 900;
   letter-spacing: 0.18em;
   text-transform: uppercase;
+}
+
+.hero .eyebrow {
+  color: rgba(233, 241, 255, 0.92);
 }
 
 .hero-copy h1,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { enrollLearner, getCourseMedia, startCourseCheckout, verifyCourseCheckout } from "./lib/api";
 import "./App.css";
 
@@ -102,6 +102,18 @@ const learningModules = {
     "Apply premium course feedback loops",
   ],
 };
+
+const heroSlides = [
+  {
+    image: "/images/Background.jpg",
+  },
+  {
+    image: "/images/Alt%20background.jpg",
+  },
+  {
+    image: "/images/imag%203.jpg",
+  },
+];
 
 function normalizePath(pathname) {
   const value = String(pathname || "/").trim();
@@ -239,6 +251,7 @@ function App() {
   const [currentLearner, setCurrentLearner] = useState(() => readLearner());
   const [courseMedia, setCourseMedia] = useState(null);
   const [courseMediaStatus, setCourseMediaStatus] = useState("idle");
+  const [heroSlideIndex, setHeroSlideIndex] = useState(0);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -260,6 +273,7 @@ function App() {
   const unlockedCount = useMemo(() => Object.values(unlocks).filter(Boolean).length, [unlocks]);
   const premiumUnlocked = Boolean(unlocks["advanced-projects"] || currentLearner?.accessLevel === "premium");
   const activeLearner = currentLearner || readLearner();
+  const activeHeroSlide = heroSlides[heroSlideIndex];
 
   function goToSignup() {
     if (currentLearner) {
@@ -308,6 +322,14 @@ function App() {
     const onPopState = () => setPathname(getCurrentPath());
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setHeroSlideIndex((current) => (current + 1) % heroSlides.length);
+    }, 5500);
+
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -514,7 +536,7 @@ function App() {
     return (
       <header className="topbar">
         <button className="brand brand-button" type="button" onClick={() => navigate("/")}>
-          <img src="/images/logo-transparent.png" alt="Faith Tech logo" />
+          <img src="/images/Main%20logo.png" alt="Faith Tech logo" />
           <span>Faith Tech</span>
         </button>
 
@@ -541,13 +563,19 @@ function App() {
   function renderHome() {
     return (
       <>
-        <section id="home" className="hero section">
+        <section
+          id="home"
+          className="hero section"
+          style={{
+            backgroundImage: `linear-gradient(115deg, rgba(4, 12, 33, 0.86), rgba(7, 21, 58, 0.5)), url(${activeHeroSlide.image})`,
+          }}
+        >
           <div className="hero-copy">
             <p className="eyebrow">SolidWorks Academy</p>
-            <h1>Build from basics to advanced with a clean SolidWorks learning path.</h1>
+            <h1>Master SOLIDWORKS. Build the Future.</h1>
             <p className="hero-text">
-              Faith Tech is an academy-style landing page for learners who want practical CAD training without clutter.
-              The experience stays simple, modern, and easy to navigate on every device.
+              Learn professional 3D design and engineering from scratch — no experience needed. Join FaithTech
+              Academy and turn your ideas into real, manufacturable products.
             </p>
 
             <div className="hero-actions">
@@ -564,32 +592,49 @@ function App() {
               <li>Project-led learning</li>
               <li>Premium access later</li>
             </ul>
-          </div>
 
-          <div className="hero-visual">
-            <article className="image-card image-card-main">
-              <img src="/images/imag%201.jpg" alt="SolidWorks training in progress" />
-              <div className="image-card-copy">
-                <span>Hands-on training</span>
-                <strong>Design. Engineer. Innovate.</strong>
+            <div className="hero-slider-controls hero-slider-controls-inline" aria-label="Hero background controls">
+              {heroSlides.map((slide, index) => (
+                <button
+                  key={slide.image}
+                  className={index === heroSlideIndex ? "hero-dot active" : "hero-dot"}
+                  type="button"
+                  aria-label={`Show background ${index + 1}`}
+                  aria-pressed={index === heroSlideIndex}
+                  onClick={() => setHeroSlideIndex(index)}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="hero-cards section">
+          <div className="hero-cards-grid">
+            <article className="image-card hero-card">
+              <img src="/images/Tutor.png" alt="Faith Tech tutor profile" />
+              <div className="image-card-copy compact">
+                <span>Free basics</span>
+                <strong>Start with clean sketches and part modeling.</strong>
               </div>
             </article>
 
-            <div className="hero-visual-grid">
-              <article className="image-card image-card-small">
-                <img src="/images/imag%204.jpg" alt="Engineering model on a workstation" />
-                <div className="image-card-copy compact">
-                  <span>Technical drawing</span>
-                  <strong>Real production-ready workflow.</strong>
-                </div>
-              </article>
+            <article className="image-card hero-card">
+              <img src="/images/imag%204.jpg" alt="Engineering workstation showing design work" />
+              <div className="image-card-copy compact">
+                <span>Build confidence</span>
+                <strong>Move from simple parts to real product workflows.</strong>
+              </div>
+            </article>
 
-              <article className="visual-info visual-video visual-video-only">
-                <video autoPlay muted loop playsInline poster="/images/logo-transparent.png">
-                  <source src="/videos/Faith%20Tech%20Intro%202.mp4" type="video/mp4" />
-                </video>
-              </article>
-            </div>
+            <article className="visual-info visual-video hero-card hero-video-card">
+              <video autoPlay muted loop playsInline poster="/images/logo-transparent.png">
+                <source src="/videos/Faith%20Tech%20Intro%202.mp4" type="video/mp4" />
+              </video>
+              <div className="video-overlay-copy">
+                <span>Faith Tech preview</span>
+                <strong>A sharper, more visual academy feel.</strong>
+              </div>
+            </article>
           </div>
         </section>
 
@@ -618,10 +663,10 @@ function App() {
             </article>
 
             <div className="about-stack">
-              <article className="tutor-card">
-                <div className="tutor-photo">
-                  <img src="/images/imag%201.jpg" alt="Tutor profile" />
-                </div>
+            <article className="tutor-card">
+              <div className="tutor-photo">
+                  <img src="/images/Tutor.png" alt="Tutor profile" />
+              </div>
 
                 <div className="tutor-copy">
                   <p className="eyebrow">Tutor Profile</p>
@@ -653,7 +698,7 @@ function App() {
                 <div className="form-panel-head">
                   <p className="eyebrow">Enrollment</p>
                   <h3>Reserve your seat and create your learner profile</h3>
-                  <p>Submit your details, set a password, and we’ll create your learner profile right away.</p>
+                  <p>Submit your details, set a password, and we'll create your learner profile right away.</p>
                 </div>
 
                 <form className="enrollment-form" onSubmit={handleSubmit}>
@@ -732,7 +777,7 @@ function App() {
           <p className="courses-meta">
             {unlockedCount > 0
               ? `${unlockedCount} premium course${unlockedCount > 1 ? "s" : ""} unlocked locally.`
-              : "Premium access is ready for Paystack checkout at ₦25,000."}
+              : "Premium access is ready for Paystack checkout at â‚¦25,000."}
           </p>
 
           <div className="course-grid">
@@ -743,7 +788,7 @@ function App() {
               return (
                 <article className={`course-card ${isPremium ? "premium" : ""} ${isUnlocked ? "unlocked" : ""}`} key={course.title}>
                   <div className="course-card-top">
-                    <span>{isPremium ? `${isUnlocked ? "Unlocked" : "Premium"} • ₦25,000` : course.tag}</span>
+                    <span>{isPremium ? `${isUnlocked ? "Unlocked" : "Premium"} - ₦25,000` : course.tag}</span>
                   </div>
                   <h3>{course.title}</h3>
                   <p>{course.description}</p>
@@ -933,7 +978,7 @@ function App() {
             <h3>{activeLearner ? activeLearner.name : "No learner profile loaded yet"}</h3>
             <p>
               {activeLearner
-                ? `${activeLearner.email} • ${activeLearner.accessLevel === "premium" ? "Pro learner" : "Free learner"}`
+                ? `${activeLearner.email} - ${activeLearner.accessLevel === "premium" ? "Pro learner" : "Free learner"}`
                 : "Create a profile from the homepage to unlock personalized learning content."}
             </p>
           </div>
@@ -1029,7 +1074,7 @@ function App() {
             <div className="upload-slot">
               <span>Course video placeholder</span>
               <p>
-                Replace this with a stored lesson video, private embed, or secure media asset when you’re ready.
+                Replace this with a stored lesson video, private embed, or secure media asset when youâ€™re ready.
               </p>
             </div>
           </article>

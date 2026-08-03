@@ -103,6 +103,22 @@ const learningModules = {
   ],
 };
 
+const courseLessonLibrary = {
+  "3d-cad-modeling": [
+    {
+      number: 2,
+      title: "Lesson 2 — Core Modeling Workflow",
+      note: "Uploaded and ready to watch",
+      playbackUrl: null,
+    },
+  ],
+  assemblies: [],
+  "surface-modelling": [],
+  simulation: [],
+  "technical-drawing": [],
+  "advanced-projects": [],
+};
+
 const heroSlides = [
   {
     image: "/images/Background.jpg",
@@ -252,6 +268,7 @@ function App() {
   const [courseMedia, setCourseMedia] = useState(null);
   const [courseMediaStatus, setCourseMediaStatus] = useState("idle");
   const [heroSlideIndex, setHeroSlideIndex] = useState(0);
+  const [selectedLessonUrls, setSelectedLessonUrls] = useState({});
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -414,6 +431,12 @@ function App() {
 
         setCourseMedia(media);
         setCourseMediaStatus("ready");
+        if (route.courseSlug === "3d-cad-modeling" && media?.playbackUrl) {
+          setSelectedLessonUrls((current) => ({
+            ...current,
+            [route.courseSlug]: media.playbackUrl,
+          }));
+        }
       } catch (error) {
         if (!active) {
           return;
@@ -998,6 +1021,14 @@ function App() {
     const isPremium = course?.accessLevel === "premium";
     const canAccess = !isPremium || premiumUnlocked;
     const modules = getLessonModules(course?.slug);
+    const courseLessons = (courseLessonLibrary[course?.slug] || []).map((lesson) => ({
+      ...lesson,
+      playbackUrl:
+        lesson.playbackUrl ||
+        (course?.slug === "3d-cad-modeling" && lesson.number === 2 ? courseMedia?.playbackUrl || null : null),
+    }));
+    const availableLessons = courseLessons.filter((lesson) => lesson.playbackUrl);
+    const activeLessonUrl = selectedLessonUrls[course?.slug] || availableLessons[0]?.playbackUrl || "";
 
     if (!course) {
       return null;
@@ -1022,6 +1053,7 @@ function App() {
             <div className="detail-pill-row">
               <span className="status-pill free">{course.tag}</span>
               <span className="status-pill">{course.lessonCount} lesson slots</span>
+              <span className="status-pill">{availableLessons.length} uploaded</span>
               <span className="status-pill">{canAccess ? "Available" : "Locked"}</span>
             </div>
           </div>
@@ -1065,17 +1097,82 @@ function App() {
           </article>
 
           <article className="lesson-panel">
-            <p className="eyebrow">Upload slot</p>
-            <h3>Where your future videos will live</h3>
+            <p className="eyebrow">Uploaded lessons</p>
+            <h3>Available videos in this course</h3>
             <p>
-              This section is ready for the course video player, lesson notes, and downloadable files once you
-              upload them.
+              {availableLessons.length > 0
+                ? `${availableLessons.length} lesson${availableLessons.length > 1 ? "s" : ""} ready for playback and download.`
+                : "No lessons uploaded yet for this course."}
             </p>
             <div className="upload-slot">
-              <span>Course video placeholder</span>
-              <p>
-                Replace this with a stored lesson video, private embed, or secure media asset when youâ€™re ready.
-              </p>
+              {canAccess && availableLessons.length > 0 ? (
+                <>
+                  <div className="lesson-player-shell">
+                    <video controls preload="metadata" playsInline poster="/images/logo-transparent.png">
+                      <source src={activeLessonUrl} type="video/mp4" />
+                    </video>
+                    <p className="lesson-player-caption">
+                      {availableLessons.find((lesson) => lesson.playbackUrl === activeLessonUrl)?.title ||
+                        "Select a lesson to watch now"}
+                    </p>
+                  </div>
+
+                  <ol className="lesson-upload-list">
+                    {availableLessons.map((lesson) => (
+                      <li key={lesson.number} className="lesson-upload-item">
+                        <div>
+                          <span>Lesson {lesson.number}</span>
+                          <strong>{lesson.title}</strong>
+                          <p>{lesson.note}</p>
+                        </div>
+                        <div className="lesson-upload-actions">
+                          <button
+                            className="secondary-btn upload-link"
+                            type="button"
+                            onClick={() =>
+                              setSelectedLessonUrls((current) => ({
+                                ...current,
+                                [course.slug]: lesson.playbackUrl,
+                              }))
+                            }
+                          >
+                            Watch now
+                          </button>
+                          <a
+                            className="secondary-btn upload-link"
+                            href={lesson.playbackUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            download
+                          >
+                            Download
+                          </a>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </>
+              ) : canAccess && courseMediaStatus === "loading" ? (
+                <div className="locked-state upload-state">
+                  <p className="eyebrow">Loading lesson library</p>
+                  <h3>Fetching uploaded lessons from Supabase.</h3>
+                </div>
+              ) : canAccess && courseMediaStatus === "error" ? (
+                <div className="locked-state upload-state">
+                  <p className="eyebrow">Lesson library unavailable</p>
+                  <h3>We could not load the uploaded lessons yet.</h3>
+                </div>
+              ) : canAccess ? (
+                <div className="locked-state upload-state">
+                  <p className="eyebrow">No uploads yet</p>
+                  <h3>This course has no uploaded lessons yet.</h3>
+                </div>
+              ) : (
+                <div className="locked-state upload-state">
+                  <p className="eyebrow">Locked lesson library</p>
+                  <h3>Unlock this course to access the uploaded videos.</h3>
+                </div>
+              )}
             </div>
           </article>
         </div>

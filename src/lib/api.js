@@ -46,6 +46,13 @@ export function getCourseMedia(courseSlug) {
   });
 }
 
+export function getHomeVideo() {
+  return requestJson("/home-video", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
 export function getApiBaseUrl() {
   return apiBaseUrl;
 }

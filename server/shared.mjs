@@ -19,11 +19,16 @@ const premiumCourses = {
   },
 };
 
+const homeVideoConfig = {
+  bucket: defaultFreeVideoBucket,
+  videoPath: "3d-cad-modeling-lesson-2.mp4",
+};
+
 const courseMediaMap = {
   "3d-cad-modeling": {
     accessLevel: "free",
     bucket: defaultFreeVideoBucket,
-    videoPath: "3d-cad-modeling/lesson-1.mp4",
+    videoPath: "3d-cad-modeling-lesson-2.mp4",
   },
   assemblies: {
     accessLevel: "free",
@@ -124,6 +129,118 @@ function buildPublicVideoUrl(env, bucketName, videoPath) {
   return `${getSupabaseApiRoot(env)}/storage/v1/object/public/${encodeURIComponent(bucketName)}/${videoPath}`;
 }
 
+function buildDownloadVideoUrl(env, bucketName, videoPath) {
+  return `${buildPublicVideoUrl(env, bucketName, videoPath)}?download`;
+}
+
+function getLessonNumberFromName(name) {
+  const match = String(name || "").match(/lesson[-_\s]*(\d+)/i) || String(name || "").match(/-(\d+)\.[a-z0-9]+$/i);
+  return match ? Number.parseInt(match[1], 10) : null;
+}
+
+function getLessonTitle(courseTitle, fileName, lessonNumber) {
+  const baseName = String(fileName || "").replace(/\.[^.]+$/, "");
+  const readableName = baseName
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (lessonNumber) {
+    return `Lesson ${lessonNumber} — ${courseTitle}`;
+  }
+
+  return readableName || courseTitle;
+}
+
+async function listStorageObjects(bucketName, prefix, env) {
+  const serviceKey = getSupabaseServiceKey(env);
+
+  if (!bucketName || !serviceKey || !env.SUPABASE_URL) {
+    return [];
+  }
+
+  const response = await fetch(`${getSupabaseApiRoot(env)}/storage/v1/object/list/${encodeURIComponent(bucketName)}`, {
+    method: "POST",
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      prefix,
+      limit: 100,
+      offset: 0,
+      sortBy: { column: "name", order: "asc" },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Supabase storage list failed: ${await response.text()}`);
+  }
+
+  const payload = await response.json();
+  return Array.isArray(payload) ? payload : [];
+}
+
+async function getCourseLessonRecords(courseSlug, env, origin) {
+  const media = courseMediaMap[courseSlug];
+  const serviceKey = getSupabaseServiceKey(env);
+
+  if (!media || !serviceKey || !env.SUPABASE_URL) {
+    return [];
+  }
+
+  const bucketName = getVideoBucketName(courseSlug, env);
+  const objects = await listStorageObjects(bucketName, courseSlug, env);
+  const lessonObjects = objects.filter((item) => /\.(mp4|mov|webm|m4v)$/i.test(item.name || ""));
+
+  return lessonObjects.map((item) => {
+    const lessonNumber = getLessonNumberFromName(item.name);
+    const videoPath = item.name;
+    const playbackUrl =
+      media.accessLevel === "free"
+        ? buildPublicVideoUrl(env, bucketName, videoPath)
+        : null;
+    const downloadUrl =
+      media.accessLevel === "free"
+        ? buildDownloadVideoUrl(env, bucketName, videoPath)
+        : null;
+
+    return {
+      number: lessonNumber,
+      title: getLessonTitle(media.title || courseSlug, item.name, lessonNumber),
+      note: "Uploaded and ready to watch",
+      fileName: item.name,
+      playbackUrl,
+      downloadUrl,
+      accessLevel: media.accessLevel,
+    };
+  }).sort((left, right) => {
+    const leftNumber = left.number || Number.MAX_SAFE_INTEGER;
+    const rightNumber = right.number || Number.MAX_SAFE_INTEGER;
+    return leftNumber - rightNumber || left.title.localeCompare(right.title);
+  });
+}
+
+function getHomeVideoRecord(env, origin) {
+  const bucket = env.SUPABASE_HOME_VIDEO_BUCKET || homeVideoConfig.bucket;
+  const videoPath = env.SUPABASE_HOME_VIDEO_PATH || homeVideoConfig.videoPath;
+
+  if (!bucket || !videoPath) {
+    return null;
+  }
+
+  return {
+    accessLevel: "free",
+    bucket,
+    videoPath,
+    apiRoot: getSupabaseApiRoot(env),
+    siteUrl: getSiteUrl(env, origin),
+    playbackUrl: buildPublicVideoUrl(env, bucket, videoPath),
+    requiresSignature: false,
+  };
+}
+
 function getCourseMediaRecord(courseSlug, env, origin) {
   const media = courseMediaMap[courseSlug];
 
@@ -139,6 +256,7 @@ function getCourseMediaRecord(courseSlug, env, origin) {
     apiRoot: getSupabaseApiRoot(env),
     siteUrl: getSiteUrl(env, origin),
     playbackUrl: media.accessLevel === "free" ? buildPublicVideoUrl(env, bucket, media.videoPath) : null,
+    downloadUrl: media.accessLevel === "free" ? buildDownloadVideoUrl(env, bucket, media.videoPath) : null,
     requiresSignature: media.accessLevel === "premium",
   };
 }
@@ -606,8 +724,13 @@ export async function handleApiRequest({ method, pathname, body, headers, env, o
       return jsonResponse(404, { error: "That course does not have media configured yet." });
     }
 
+    const lessons = await getCourseLessonRecords(courseSlug, env, origin);
+
     if (course.accessLevel === "free") {
-      return jsonResponse(200, course);
+      return jsonResponse(200, {
+        ...course,
+        lessons,
+      });
     }
 
     const playbackUrl = await createSignedVideoUrl(courseSlug, env);
@@ -615,7 +738,18 @@ export async function handleApiRequest({ method, pathname, body, headers, env, o
     return jsonResponse(200, {
       ...course,
       playbackUrl,
+      lessons,
     });
+  }
+
+  if (method === "POST" && pathname === "/api/home-video") {
+    const homeVideo = getHomeVideoRecord(env, origin);
+
+    if (!homeVideo) {
+      return jsonResponse(404, { error: "Homepage video is not configured yet." });
+    }
+
+    return jsonResponse(200, homeVideo);
   }
 
   if (method === "POST" && pathname === "/api/create-checkout-session") {

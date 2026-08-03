@@ -21,6 +21,7 @@ This starts the Vite UI and the local API server together.
 - `SUPABASE_URL` and `SUPABASE_SECRET_KEY` store enrollments and learner profiles in Supabase.
 - `SUPABASE_PUBLISHABLE_KEY` is kept for future client-side Supabase work.
 - `SUPABASE_FREE_VIDEO_BUCKET` and `SUPABASE_PREMIUM_VIDEO_BUCKET` control course video storage.
+- `SUPABASE_HOME_VIDEO_BUCKET` and `SUPABASE_HOME_VIDEO_PATH` control the homepage hero video.
 - Supabase Auth uses an email + password flow for the learner login experience.
 - Resend works best with a verified sender on the Faith Tech domain later on; your current Gmail sender is fine for testing if it is verified in Resend.
 
